@@ -1,84 +1,52 @@
-# core/solver_lp.py
 import numpy as np
-from scipy.optimize import linprog
 
-def solve_nash_lp(A, B):
+def normalize(vec):
+    vec = np.array(vec, dtype=float)
+    s = vec.sum()
+    if s <= 0:
+        return np.ones_like(vec) / len(vec)
+    return vec / s
+
+def fictitious_play(A, B, iterations=20000, tol=1e-7):
     """
-    Solve for a Nash equilibrium approximation using LP (maximin) for zero-sum like reductions.
-    For general-sum bimatrix, we solve two independent maxmin problems as an approximation:
-    returns mixed strategies p (len m) and q (len n).
-    Note: For true bimatrix NE use support enumeration or Lemke-Howson.
+    Fictitious play for bimatrix games.
+    Returns (p, q, iters) - empirical mixed strategies and number of iterations used.
     """
     A = np.array(A, dtype=float)
     B = np.array(B, dtype=float)
     m, n = A.shape
 
-    # Solve for Player 1: maximize v subject to p>=0, sum(p)=1, A^T p >= v
-    # Transform to linprog (minimize c^T x). We'll solve using the standard trick:
-    # Minimize -v  subject to A^T p - v >= 0, sum p = 1, p >= 0
-    # Variables: [p_0..p_{m-1}, v]
-    c = np.zeros(m + 1)
-    c[-1] = -1.0  # minimize -v  <=> maximize v
+    cum_p = np.zeros(m)
+    cum_q = np.zeros(n)
 
-    # Inequality: for each column j: -A[:,j]^T p + v <= 0  =>  (-A[:,j], 1) dot x <= 0
-    A_ub = []
-    b_ub = []
-    for j in range(n):
-        row = np.zeros(m + 1)
-        row[:m] = -A[:, j]
-        row[-1] = 1.0
-        A_ub.append(row)
-        b_ub.append(0.0)
-    A_ub = np.array(A_ub)
-    b_ub = np.array(b_ub)
+    # start uniform
+    p = np.ones(m) / m
+    q = np.ones(n) / n
+    cum_p += p
+    cum_q += q
+    last_p = p.copy()
+    last_q = q.copy()
 
-    # Equality constraint sum(p) = 1:  (1...1, 0) dot x = 1
-    A_eq = np.zeros((1, m + 1))
-    A_eq[0, :m] = 1.0
-    b_eq = np.array([1.0])
+    for t in range(1, iterations + 1):
+        # Player1 best response to q
+        exp_p = A @ q
+        best_p_idxs = np.where(np.abs(exp_p - exp_p.max()) <= 1e-12)[0]
+        br_p = np.zeros(m); br_p[best_p_idxs] = 1.0 / best_p_idxs.size
 
-    bounds = [(0, None)] * m + [(None, None)]  # p_i >=0, v free
-    res1 = linprog(c, A_ub=A_ub, b_ub=b_ub, A_eq=A_eq, b_eq=b_eq, bounds=bounds, method='highs')
+        # Player2 best response to p
+        exp_q = p @ B
+        best_q_idxs = np.where(np.abs(exp_q - exp_q.max()) <= 1e-12)[0]
+        br_q = np.zeros(n); br_q[best_q_idxs] = 1.0 / best_q_idxs.size
 
-    if not res1.success:
-        raise RuntimeError("LP solver failed for player 1: " + str(res1.message))
+        cum_p += br_p
+        cum_q += br_q
 
-    p = res1.x[:m]
-    if p.sum() <= 0:
-        p = np.ones(m) / m
-    else:
-        p = p / p.sum()
+        p = cum_p / cum_p.sum()
+        q = cum_q / cum_q.sum()
 
-    # Solve for Player 2 similarly on B (columns are player2's pure strategies)
-    # We construct LP for q of length n:
-    c = np.zeros(n + 1)
-    c[-1] = -1.0
+        if np.linalg.norm(p - last_p, ord=1) < tol and np.linalg.norm(q - last_q, ord=1) < tol:
+            return p, q, t
+        last_p = p.copy()
+        last_q = q.copy()
 
-    A_ub = []
-    b_ub = []
-    for i in range(m):
-        row = np.zeros(n + 1)
-        row[:n] = -B[i, :]
-        row[-1] = 1.0
-        A_ub.append(row)
-        b_ub.append(0.0)
-    A_ub = np.array(A_ub)
-    b_ub = np.array(b_ub)
-
-    A_eq = np.zeros((1, n + 1))
-    A_eq[0, :n] = 1.0
-    b_eq = np.array([1.0])
-
-    bounds = [(0, None)] * n + [(None, None)]
-    res2 = linprog(c, A_ub=A_ub, b_ub=b_ub, A_eq=A_eq, b_eq=b_eq, bounds=bounds, method='highs')
-
-    if not res2.success:
-        raise RuntimeError("LP solver failed for player 2: " + str(res2.message))
-
-    q = res2.x[:n]
-    if q.sum() <= 0:
-        q = np.ones(n) / n
-    else:
-        q = q / q.sum()
-
-    return p, q
+    return p, q, iterations
