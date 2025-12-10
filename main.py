@@ -1,9 +1,13 @@
+# main.py
 import argparse
 import numpy as np
 from core.payoff_matrix import PayoffMatrix
 from core.solver_lp import solve_zero_sum_lp
 from core.solver_iterative import fictitious_play
 from core.equilibrium_checker import unilateral_deviation_gain
+from algorithms.lemke_howson import lemke_howson_all
+from utils.matrix_loader import load_matrix, EXAMPLES
+from utils.plotting import plot_convergence
 
 
 def print_equilibrium(p, q, info=None):
@@ -31,3 +35,38 @@ def main():
         A = load_matrix(args.a)
         B = load_matrix(args.b)
 
+    # Validate
+    pm = PayoffMatrix(A, B)
+
+    method = args.method
+    if method == 'auto':
+        if pm.is_zero_sum():
+            method = 'lp-zero-sum'
+        else:
+            method = 'fictitious-play'
+
+    print("Using method:", method)
+    if method == 'lp-zero-sum':
+        p, q, v = solve_zero_sum_lp(pm.A)
+        info = {'value': v}
+        dev = unilateral_deviation_gain(pm.A, pm.B, p, q)
+        info.update(dev)
+        print_equilibrium(p, q, info)
+    elif method == 'fictitious-play':
+        p, q, iters = fictitious_play(pm.A, pm.B, iterations=args.fp_iters)
+        info = {'iterations': iters}
+        dev = unilateral_deviation_gain(pm.A, pm.B, p, q)
+        info.update(dev)
+        print_equilibrium(p, q, info)
+    elif method == 'lemke-howson':
+        try:
+            eqs = lemke_howson_all(pm.A, pm.B)
+            for idx, (p, q) in enumerate(eqs, start=1):
+                print(f"--- Equilibrium {idx} ---")
+                dev = unilateral_deviation_gain(pm.A, pm.B, p, q)
+                print_equilibrium(p, q, dev)
+        except Exception as e:
+            print("Lemke-Howson failed or nashpy not installed:", e)
+
+if __name__ == '__main__':
+    main()
