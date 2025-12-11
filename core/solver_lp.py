@@ -32,3 +32,28 @@ def solve_zero_sum_lp(A):
         A_ub[j, :m] = -A[:, j]
         A_ub[j, m] = 1.0
 
+    # Equality: sum p_i = 1
+    A_eq = np.zeros((1, m + 1))
+    A_eq[0, :m] = 1.0
+    b_eq = np.array([1.0])
+
+    bounds = [(0, None)] * m + [(None, None)]
+
+    res = linprog(c, A_ub=A_ub, b_ub=b_ub, A_eq=A_eq, b_eq=b_eq, bounds=bounds, method='highs')
+    if not res.success:
+        raise RuntimeError("LP failed: " + res.message)
+
+    p = normalize(res.x[:m])
+    v = res.x[-1]
+
+    # Compute q as distribution over columns that minimize expected payoff
+    expected_cols = p @ A
+    min_val = expected_cols.min()
+    tol = 1e-9
+    support = np.where(np.abs(expected_cols - min_val) <= tol)[0]
+    if support.size == 0:
+        support = np.array([expected_cols.argmin()])
+    q = np.zeros(n)
+    q[support] = 1.0 / support.size
+    q = normalize(q)
+    return p, q, float(v)
