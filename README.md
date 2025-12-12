@@ -15,7 +15,6 @@ Ky projekt implementon një sistem të plotë për gjetjen e ekuilibrit të Nash
 - ✔ **Kontrollues të devijimeve të njëanshme** për verifikimin e ekuilibrit (equilibrium checker)
 
 ### Funksionalitete të tjera:
-- GUI interaktiv me Tkinter
 - CLI (Command Line Interface)
 - Alexa tests (pytest) për siguri dhe korrektësi
 
@@ -35,12 +34,11 @@ Ky projekt është i dizajnuar për përdorim akademik dhe demonstrim të koncep
 ├── utils/
 │   ├── matrix_examples.py
 │   ├── matrix_loader.py
-│   ├── plotting.py
+│  
 ├── tests/
 │   ├── test_checker.py
 │   ├── test_iterative.py
 │   ├── test_lp.py
-├── gui.py
 ├── main.py
 └── README.md
 
@@ -62,7 +60,6 @@ pip install -r requirements.txt
 Varësitë kryesore:
 - numpy
 - scipy
-- matplotlib
 - tkinter (vjen me Python)
 
 

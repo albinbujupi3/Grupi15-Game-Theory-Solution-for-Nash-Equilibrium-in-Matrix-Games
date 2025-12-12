@@ -6,8 +6,8 @@ from core.solver_lp import solve_zero_sum_lp
 from core.solver_iterative import fictitious_play
 from core.equilibrium_checker import unilateral_deviation_gain
 from algorithms.lemke_howson import lemke_howson_all
-from utils.matrix_loader import load_matrix, EXAMPLES
-from utils.plotting import plot_convergence
+from utils.matrix_loader import load_matrix
+from utils.matrix_examples import EXAMPLES
 
 
 def print_equilibrium(p, q, info=None):
